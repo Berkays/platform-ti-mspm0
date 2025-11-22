@@ -1,0 +1,27 @@
+{
+    "build": {
+        "cpu": "cortex-m0plus",
+        "mcu": "mspm0l1306",
+        "f_cpu": "32000000L",
+        "product_line": "mspm0l11xx_l13xx"
+    },
+    "debug": {
+        "default_tools": [
+            "jlink",
+            "openocd"
+        ],
+        "jlink_device": "MSPM0L1306",
+        "openocd_target": "None"
+    },
+    "name": "TI MSPM0L1306",
+    "upload": {
+        "maximum_ram_size": 4096,
+        "maximum_size": 65536,
+        "protocol": "jlink",
+        "protocols": [
+            "jlink"
+        ]
+    },
+    "url": "https://www.ti.com/product/MSPM0L1306",
+    "vendor": "TI"
+}

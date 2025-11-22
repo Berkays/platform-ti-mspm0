@@ -1,0 +1,53 @@
+{
+    "name": "timspm0",
+    "title": "TI MSPM0 Platform",
+    "description": "Development platform for TI MSPM0 based microcontroller series",
+    "homepage": "https://www.ti.com/tool/MSPM0-SDK",
+    "license": "Apache-2.0",
+    "keywords": [
+        "dev-platform",
+        "MSPM0",
+        "TI",
+        "SDK"
+    ],
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/Berkays/platform-ti-mspm0"
+    },
+    "version": "0.1.0",
+    "frameworks": {},
+    "scripts": {
+        "postinstall": "scripts/postinstall.py",
+        "preuninstall": "scripts/preuninstall.py"
+    },
+    "packages": {
+        "toolchain-gccarmnoneeabi": {
+            "type": "toolchain",
+            "optional": false,
+            "owner": "platformio",
+            "version": "^1.140201.0"
+        },
+        "toolchain-timspm0-sdk": {
+            "type": "toolchain",
+            "optional": false,
+            "version": "^2.8.0-3"
+        },
+        "tool-timspm0-sysconfig": {
+            "type": "toolchain",
+            "optional": false,
+            "version": "^1.25.0"
+        },
+        "tool-openocd": {
+            "type": "uploader",
+            "optional": true,
+            "owner": "platformio",
+            "version": "~2.1100.0"
+        },
+        "tool-jlink": {
+            "type": "uploader",
+            "optional": true,
+            "owner": "platformio",
+            "version": "^1.63208.0"
+        }
+    }
+}

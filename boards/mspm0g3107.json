@@ -1,0 +1,27 @@
+{
+    "build": {
+        "cpu": "cortex-m0plus",
+        "mcu": "mspm0g3107",
+        "f_cpu": "80000000L",
+        "product_line": "mspm0g1x0x_g3x0x"
+    },
+    "debug": {
+        "default_tools": [
+            "jlink",
+            "openocd"
+        ],
+        "jlink_device": "MSPM0G3107",
+        "openocd_target": "None"
+    },
+    "name": "TI MSPM0G3107",
+    "upload": {
+        "maximum_ram_size": 32768,
+        "maximum_size": 131072,
+        "protocol": "jlink",
+        "protocols": [
+            "jlink"
+        ]
+    },
+    "url": "https://www.ti.com/product/MSPM0G3107",
+    "vendor": "TI"
+}

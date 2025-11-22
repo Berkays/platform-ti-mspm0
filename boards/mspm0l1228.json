@@ -1,0 +1,27 @@
+{
+    "build": {
+        "cpu": "cortex-m0plus",
+        "mcu": "mspm0l1228",
+        "f_cpu": "32000000L",
+        "product_line": "mspm0l122x_l222x"
+    },
+    "debug": {
+        "default_tools": [
+            "jlink",
+            "openocd"
+        ],
+        "jlink_device": "MSPM0L1228",
+        "openocd_target": "None"
+    },
+    "name": "TI MSPM0L1228",
+    "upload": {
+        "maximum_ram_size": 32768,
+        "maximum_size": 262144,
+        "protocol": "jlink",
+        "protocols": [
+            "jlink"
+        ]
+    },
+    "url": "https://www.ti.com/product/MSPM0L1228",
+    "vendor": "TI"
+}

@@ -1,0 +1,27 @@
+{
+    "build": {
+        "cpu": "cortex-m0plus",
+        "mcu": "mspm0c1103",
+        "f_cpu": "24000000L",
+        "product_line": "mspm0c110x"
+    },
+    "debug": {
+        "default_tools": [
+            "jlink",
+            "openocd"
+        ],
+        "jlink_device": "MSPM0C1103",
+        "openocd_target": "None"
+    },
+    "name": "TI MSPM0C1103",
+    "upload": {
+        "maximum_ram_size": 1024,
+        "maximum_size": 8192,
+        "protocol": "jlink",
+        "protocols": [
+            "jlink"
+        ]
+    },
+    "url": "https://www.ti.com/product/MSPM0C1103",
+    "vendor": "TI"
+}
