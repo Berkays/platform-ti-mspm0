@@ -30,12 +30,12 @@
         "toolchain-timspm0-sdk": {
             "type": "toolchain",
             "optional": false,
-            "version": "^2.8.0-3"
+            "version": "https://github.com/Berkays/toolchain-timspm0-sdk.git"
         },
         "tool-timspm0-sysconfig": {
             "type": "toolchain",
             "optional": false,
-            "version": "^1.25.0"
+            "version": "https://github.com/Berkays/tool-mspm0-sysconfig.git"
         },
         "tool-openocd": {
             "type": "uploader",
