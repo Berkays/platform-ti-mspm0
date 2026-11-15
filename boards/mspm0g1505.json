@@ -7,11 +7,9 @@
     },
     "debug": {
         "default_tools": [
-            "jlink",
-            "openocd"
+            "jlink"
         ],
-        "jlink_device": "MSPM0G1505",
-        "openocd_target": "None"
+        "jlink_device": "MSPM0G1505"
     },
     "name": "TI MSPM0G1505",
     "upload": {

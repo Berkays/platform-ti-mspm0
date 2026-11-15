@@ -2,7 +2,7 @@
     "name": "timspm0",
     "title": "TI MSPM0 Platform",
     "description": "Development platform for TI MSPM0 based microcontroller series",
-    "homepage": "https://www.ti.com/tool/MSPM0-SDK",
+    "homepage": "https://github.com/Berkays/platform-ti-mspm0",
     "license": "Apache-2.0",
     "keywords": [
         "dev-platform",
@@ -10,16 +10,15 @@
         "TI",
         "SDK"
     ],
+    "engines": {
+        "platformio": "^6"
+    },
     "repository": {
         "type": "git",
         "url": "https://github.com/Berkays/platform-ti-mspm0"
     },
-    "version": "0.1.0",
+    "version": "1.0.0",
     "frameworks": {},
-    "scripts": {
-        "postinstall": "scripts/postinstall.py",
-        "preuninstall": "scripts/preuninstall.py"
-    },
     "packages": {
         "toolchain-gccarmnoneeabi": {
             "type": "toolchain",
@@ -33,7 +32,7 @@
             "version": "https://github.com/Berkays/toolchain-timspm0-sdk.git"
         },
         "tool-timspm0-sysconfig": {
-            "type": "toolchain",
+            "type": "tool",
             "optional": false,
             "version": "https://github.com/Berkays/tool-mspm0-sysconfig.git"
         },

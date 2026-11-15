@@ -1,12 +1,14 @@
+import json
 import os
-from os import makedirs
-from os.path import join, isdir
 import re
+import subprocess
 import sys
+from os.path import isdir, isfile, join
+from shutil import which
 
-from platform import system # type: ignore
+from platform import system  # type: ignore
 
-from SCons.Script import Default, DefaultEnvironment, AlwaysBuild, Builder, COMMAND_LINE_TARGETS, ARGUMENTS # type: ignore
+from SCons.Script import Default, DefaultEnvironment, AlwaysBuild, Builder, COMMAND_LINE_TARGETS, ARGUMENTS  # type: ignore
 
 OS = system().lower()
 
@@ -22,7 +24,7 @@ BOARD_MCU_NAME = env.get("BOARD", None)
 assert BOARD_MCU_NAME, "Missing MCU Board in platformio.ini"
 
 PROJECT_DIR = env.get('PROJECT_DIR')
-PROJECT_SRC_DIR = env.get('PROJECT_DIR')
+PROJECT_SRC_DIR = env.get('PROJECT_SRC_DIR')
 PROJECT_BUILD_DIR = join(env.get('PROJECT_BUILD_DIR'), BOARD_MCU_NAME)
 PROJECT_INCLUDE_DIR = env.get('PROJECT_INCLUDE_DIR')
 
@@ -33,23 +35,55 @@ if env.get("PROGNAME", "program") == "program":
 TI_MSPM0_SDK_PACKAGE_NAME = "toolchain-timspm0-sdk"
 TI_MSPM0_SYSCONFIG_PACKAGE_NAME = "tool-timspm0-sysconfig"
 GCC_ARM_COMPILER_PACKAGE_NAME = "toolchain-gccarmnoneeabi"
-try:
-    platform.get_package(TI_MSPM0_SDK_PACKAGE_NAME)
-except KeyError:
-    errAndExit("Error: MSP SDK Not found in platformio packages.\n")
 
-try:
-    platform.get_package(TI_MSPM0_SYSCONFIG_PACKAGE_NAME)
-except KeyError:
-    errAndExit("Error: Sysconfig Tool not found in platformio packages.\n")
+MSPM0_SDK_DIR = join(platform.get_package_dir(TI_MSPM0_SDK_PACKAGE_NAME) or "", "mspm0-sdk")
+if not isdir(MSPM0_SDK_DIR):
+    errAndExit(
+        "Error: TI MSPM0 SDK package not found.\n"
+        "Re-install it with: pio pkg install -l \"%s\"" % TI_MSPM0_SDK_PACKAGE_NAME
+    )
+print("MSPM0 SDK package version: %s" % platform.get_package_version(TI_MSPM0_SDK_PACKAGE_NAME))
 
-MSPM0_SDK_DIR = join(platform.get_package_dir(TI_MSPM0_SDK_PACKAGE_NAME), "mspm0-sdk")
-print(f"SDK Version: {platform.get_package_version(TI_MSPM0_SDK_PACKAGE_NAME)}")
-MSPM0_SDK_METADATA_FILE = join(MSPM0_SDK_DIR,'.metadata/product.json')
+MSPM0_SDK_METADATA_FILE = join(MSPM0_SDK_DIR, '.metadata', 'product.json')
+if not isfile(MSPM0_SDK_METADATA_FILE):
+    errAndExit(f"Error: MSPM0 SDK metadata not found at {MSPM0_SDK_METADATA_FILE}")
+
+# The authoritative SDK version (e.g. "2.08.00.03") comes from TI's metadata
+# and is used when generating starter .syscfg files. Never hardcode it.
+with open(MSPM0_SDK_METADATA_FILE, mode='r') as fp:
+    MSPM0_SDK_PRODUCT = json.load(fp)
+MSPM0_SDK_VERSION = MSPM0_SDK_PRODUCT.get("version", "")
+print("MSPM0 SDK version: %s" % MSPM0_SDK_VERSION)
+
+SYSCONFIG_PACKAGE_DIR = platform.get_package_dir(TI_MSPM0_SYSCONFIG_PACKAGE_NAME) or ""
+SYSCONFIG_BIN_DIR = join(SYSCONFIG_PACKAGE_DIR, 'bin')
+TI_SYSCONFIG_CLI = join(SYSCONFIG_BIN_DIR, 'dist', 'cli.js')
+if not isfile(TI_SYSCONFIG_CLI):
+    errAndExit(
+        f"Error: TI SysConfig CLI not found at {TI_SYSCONFIG_CLI}\n"
+        "Re-install it with: pio pkg install -l \"%s\"" % TI_MSPM0_SYSCONFIG_PACKAGE_NAME
+    )
+
+# Resolve a Node.js runtime for the SysConfig CLI. Prefer the one bundled by
+# the tool package (downloaded by its post-install script), fall back to any
+# Node.js available on PATH. Works on Windows, macOS and Linux.
+NODE_EXE_NAME = "node.exe" if OS == "windows" else "node"
+TI_SYSCONFIG_NODE = join(SYSCONFIG_BIN_DIR, 'nodejs', NODE_EXE_NAME)
+if isfile(TI_SYSCONFIG_NODE):
+    print("SysConfig Node.js: %s" % TI_SYSCONFIG_NODE)
+else:
+    TI_SYSCONFIG_NODE = which(NODE_EXE_NAME)
+    if TI_SYSCONFIG_NODE:
+        print("SysConfig Node.js (from PATH): %s" % TI_SYSCONFIG_NODE)
+    else:
+        errAndExit(
+            "Error: Node.js runtime for TI SysConfig not found.\n"
+            "Re-install the tool package (its post-install script downloads Node.js):\n"
+            "  pio pkg update -g -t \"%s\"" % TI_MSPM0_SYSCONFIG_PACKAGE_NAME
+        )
 
 COMPILER_PATH = platform.get_package_dir(GCC_ARM_COMPILER_PACKAGE_NAME)
 
-TI_SYSCFG_PATH = join(platform.get_package_dir(TI_MSPM0_SYSCONFIG_PACKAGE_NAME), 'bin', 'sysconfig_cli.sh')
 TI_C_COMPILER_PATH = join(COMPILER_PATH, 'bin', 'arm-none-eabi-gcc')
 TI_CPP_COMPILER_PATH = join(COMPILER_PATH, 'bin', 'arm-none-eabi-g++')
 TI_BINSIZE_PATH = join(COMPILER_PATH, 'bin', 'arm-none-eabi-size')
@@ -61,11 +95,7 @@ TI_RANLIB_PATH = join(COMPILER_PATH, 'bin', 'arm-none-eabi-gcc-ranlib')
 
 SYSCONFIG_GEN_DIR = join(PROJECT_BUILD_DIR, 'syscfg')
 
-# # Check if sysconfig compiler exists
-if not os.path.exists(TI_SYSCFG_PATH):
-    errAndExit(f"Error: TI SysConfig Compiler not found at {TI_SYSCFG_PATH}")
-
-env.Replace( # type: ignore
+env.Replace(  # type: ignore
     CC=TI_C_COMPILER_PATH,       # TI ARM compiler
     CXX=TI_CPP_COMPILER_PATH,      # TI ARM compiler
     LINK=TI_C_COMPILER_PATH,     # TI ARM linker
@@ -86,62 +116,138 @@ env.Replace(
     SIZEDATAREGEXP=r"^(?:\.data|\.bss|\.noinit)\s+(\d+).*"
 )
 
-# Locate .sysconfig file in project root directory
-sysConfigFile = None
-isUsingSyscfgTemplate = False
-for filename in os.listdir(PROJECT_DIR):
-        filepath = os.path.join(PROJECT_DIR, filename)
-        if os.path.isfile(filepath) and filename.endswith('.syscfg'):
-            sysConfigFile = filepath
-        
-# Generate template sysconfig file
-if(sysConfigFile is None):
 
-    if(os.path.exists(SYSCONFIG_GEN_DIR)):
-        errAndExit(".syscfg file not found")
-    # src = join(platform.get_dir(), 'builder', 'template.syscfg')
+def mcu_to_syscfg_family(mcu):
+    """Map an exact part to its SysConfig device family.
 
-    sysConfigTemplate = f"""/**
- * @cliArgs --device "{board.get("build.product_line").upper()}" --part "Default" --product "mspm0_sdk@2.08.00.03"
- * @v2CliArgs --device "{board.get("build.mcu").upper()}" --product "mspm0_sdk@2.08.00.03"
+    MSPM0G3507 -> mspm0g350x, MSPM0L1117 -> mspm0l111x, ...
+    """
+    mcu = (mcu or "").lower()
+    if mcu and mcu[-1].isdigit():
+        return mcu[:-1] + "x"
+    return mcu
+
+
+# Locate .syscfg file in the project (root first, then src/)
+syscfg_candidates = []
+for search_dir in (PROJECT_DIR, PROJECT_SRC_DIR):
+    if not isdir(search_dir):
+        continue
+    for filename in sorted(os.listdir(search_dir)):
+        filepath = join(search_dir, filename)
+        if isfile(filepath) and filename.endswith('.syscfg'):
+            syscfg_candidates.append(filepath)
+
+if len(syscfg_candidates) > 1:
+    sys.stderr.write(
+        "Warning! Multiple .syscfg files found, using %s:\n" % syscfg_candidates[0])
+    for candidate in syscfg_candidates:
+        sys.stderr.write(" - %s\n" % candidate)
+
+sysConfigFile = syscfg_candidates[0] if syscfg_candidates else None
+
+# No .syscfg supplied: seed the project with a starter configuration that
+# follows TI's "empty" example (SYSCTL + Board modules) so the project
+# compiles out of the box and can be refined in the SysConfig GUI.
+if sysConfigFile is None:
+    board_mcu = board.get("build.mcu")
+    board_family = mcu_to_syscfg_family(board_mcu)
+    starter = f"""/**
+ * Starter TI SysConfig configuration generated by the timspm0 PlatformIO platform.
+ * Open this file in the TI SysConfig GUI (https://www.ti.com/tool/SYSCONFIG)
+ * to configure clocks, peripherals and pins. It is re-processed on every build.
+ * @cliArgs --device "{board_family.upper()}" --part "Default" --product "mspm0_sdk@{MSPM0_SDK_VERSION}"
+ * @v2CliArgs --device "{board_mcu.upper()}" --product "mspm0_sdk@{MSPM0_SDK_VERSION}"
  */
 
-const ProjectConfig = scripting.addModule("/ti/project_config/ProjectConfig");
+/**
+ * Import the modules used in this configuration.
+ */
+const SYSCTL = scripting.addModule("/ti/driverlib/SYSCTL");
 
-ProjectConfig.deviceSpin = "{board.get("build.mcu").upper()}";
-ProjectConfig.compiler = "gcc";
+/**
+ * Write custom configuration values to the imported modules.
+ */
+
+const Board = scripting.addModule("/ti/driverlib/Board", {{}}, false);
 """
     sysConfigFile = join(PROJECT_DIR, 'template.syscfg')
-    with open(sysConfigFile, mode='w') as file:
-        file.write(sysConfigTemplate)
-    file.close()
-    print(f".syscfg file not found. Using default template...")
-    isUsingSyscfgTemplate = True
+    with open(sysConfigFile, mode='w') as fp:
+        fp.write(starter)
+    print("No .syscfg file found - created a starter configuration at %s" % sysConfigFile)
 else:
-    print(f"Found .syscfg file: {sysConfigFile}")
+    print("Found .syscfg file: %s" % sysConfigFile)
 
-# Get MCU Model from .syscfg file
-fread = open(sysConfigFile, mode='r')
-syscfgFileContents= fread.read(-1)
-fread.close()
+# Get MCU device from .syscfg file. The "@cliArgs --device" directive carries
+# the device family (e.g. MSPM0G350X) and "@v2CliArgs --device" the exact
+# part (e.g. MSPM0G3507).
+with open(sysConfigFile, mode='r') as fp:
+    syscfgFileContents = fp.read()
 
-# Get MCU Designator from .syscfg file
-pattern = r"@cliArgs\s*--device\s*\"(\w*)\""
-match = re.search(pattern, syscfgFileContents)
-startupDriverMCUDesignator = None
-if match:
-    startupDriverMCUDesignator = match.group(1).lower()  # Output: mspm0l110x
-else:
-    errAndExit("Failed to parse MCU from .syscfg file.")
+def _parse_cli_device(directive):
+    device = None
+    for m in re.finditer(r"@%s[^\n]*" % directive, syscfgFileContents):
+        dm = re.search(r'--device\s+"([^"]+)"', m.group(0))
+        if dm:
+            device = dm.group(1)
+    return (device or "").strip()
 
+syscfg_family_raw = _parse_cli_device("cliArgs")
+syscfg_part_raw = _parse_cli_device("v2CliArgs")
 
-# Run SysConfig Compiler
-env.Execute(f'"{TI_SYSCFG_PATH}" --script "{sysConfigFile}" -o "{SYSCONFIG_GEN_DIR}" -s "{MSPM0_SDK_METADATA_FILE}" --compiler gcc')
-if(isUsingSyscfgTemplate):
-    os.remove(sysConfigFile)
+startupDriverMCUDesignator = mcu_to_syscfg_family(syscfg_family_raw or syscfg_part_raw)
+if not startupDriverMCUDesignator or not startupDriverMCUDesignator.startswith("mspm0"):
+    errAndExit(
+        'Failed to parse the MCU device from "%s".\n'
+        "Make sure the file contains a '@cliArgs --device \"...\"' or "
+        "'@v2CliArgs --device \"...\"' directive (files generated by TI SysConfig do)."
+        % sysConfigFile
+    )
 
-if((isUsingSyscfgTemplate is False) and os.path.exists(join(SYSCONFIG_GEN_DIR, "ti_msp_dl_config.c")) is False):
-    errAndExit("MSP configuration source files not found. Make sure to have a valid .syscfg file in your project")
+# Guard against board <-> .syscfg device mismatches that would otherwise
+# fail much later with confusing linker/upload errors.
+board_family = mcu_to_syscfg_family(board.get("build.mcu"))
+if startupDriverMCUDesignator != board_family:
+    errAndExit(
+        "Error: device mismatch between board and .syscfg file:\n"
+        "  board '%s' expects device family '%s'\n"
+        "  '%s' targets device family '%s'\n"
+        "Use a matching board in platformio.ini, or update your .syscfg file."
+        % (BOARD_MCU_NAME, board_family, sysConfigFile, startupDriverMCUDesignator)
+    )
+
+startup_file = join(
+    MSPM0_SDK_DIR, 'source', 'ti', 'devices', 'msp', 'm0p',
+    'startup_system_files', 'gcc', f'startup_{startupDriverMCUDesignator}_gcc.c')
+if not isfile(startup_file):
+    errAndExit(
+        "Error: startup file for device family '%s' not found in the MSPM0 SDK.\n"
+        "Expected: %s" % (startupDriverMCUDesignator, startup_file)
+    )
+
+# Run SysConfig CLI (invoked directly through Node.js so that it works on
+# every host OS without shell wrappers; a failure aborts the build).
+sysconfig_cmd = [
+    TI_SYSCONFIG_NODE,
+    TI_SYSCONFIG_CLI,
+    "--script", sysConfigFile,
+    "--output", SYSCONFIG_GEN_DIR,
+    "-s", MSPM0_SDK_METADATA_FILE,
+    "--compiler", "gcc",
+]
+print("Running TI SysConfig: %s" % " ".join(sysconfig_cmd[1:]))
+result = subprocess.run(sysconfig_cmd)
+if result.returncode != 0:
+    errAndExit(
+        "Error: TI SysConfig code generation failed (exit code %d).\n"
+        "Fix the issues reported above in %s" % (result.returncode, sysConfigFile)
+    )
+
+if not isfile(join(SYSCONFIG_GEN_DIR, "ti_msp_dl_config.c")):
+    errAndExit(
+        "MSP configuration source files were not generated. "
+        "Make sure to have a valid .syscfg file in your project."
+    )
 
 common_compile_options = [
     f'@{join(SYSCONFIG_GEN_DIR, "device.opt")}',
@@ -207,9 +313,8 @@ env.Append(
 )
 
 # Add MCU Compiler definition required for VSCode intellisense
-fread = open(join(SYSCONFIG_GEN_DIR, 'device.opt'), mode='r')
-deviceOptContents = fread.read(-1)
-fread.close()
+with open(join(SYSCONFIG_GEN_DIR, 'device.opt'), mode='r') as fp:
+    deviceOptContents = fp.read()
 
 pattern = r'-D(\w*__)'
 match = re.search(pattern, deviceOptContents)
@@ -219,7 +324,7 @@ if match:
 # External source files
 sources = [
     join(SYSCONFIG_GEN_DIR, 'ti_msp_dl_config.c'),
-    join(MSPM0_SDK_DIR, 'source', 'ti', 'devices', 'msp', 'm0p', 'startup_system_files', 'gcc', f'startup_{startupDriverMCUDesignator}_gcc.c'),
+    startup_file,
 ]
 
 # Source object files
@@ -251,7 +356,7 @@ if "nobuild" in COMMAND_LINE_TARGETS:
 else:
     env.Append(PIOBUILDFILES=objects)
     target_elf = env.BuildProgram()
-    
+
     target_firmware = env.ElfToBin(join(PROJECT_BUILD_DIR, "${PROGNAME}.bin"), target_elf)
     env.Depends(target_firmware, 'checkprogsize')
 
@@ -279,7 +384,7 @@ if upload_protocol.startswith("jlink"):
     def _jlink_cmd_script(env, source):
         build_dir = env.subst("$BUILD_DIR")
         if not isdir(build_dir):
-            makedirs(build_dir)
+            os.makedirs(build_dir)
         script_path = join(build_dir, "upload.jlink")
         commands = [
             "h",

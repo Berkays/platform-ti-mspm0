@@ -65,7 +65,7 @@ class Timspm0Platform(PlatformBase):
                             "-port", "2331"
                         ],
                         "executable": ("JLinkGDBServerCL.exe"
-                                       if OS != "windows" else
+                                       if OS == "win32" else
                                        "JLinkGDBServer")
                     }
                 }
