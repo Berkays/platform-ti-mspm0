@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-examples:
+    name: Build examples (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install PlatformIO Core
+        run: pip install --upgrade platformio
+
+      # Requires the timspm0 platform and its toolchain-timspm0-sdk /
+      # tool-timspm0-sysconfig packages to be published to the PlatformIO
+      # Registry (see README "Maintainer notes"). The first build downloads
+      # the toolchain, the SDK and the SysConfig CLI automatically.
+      - name: Build blinky example
+        run: pio run -d examples/mspm0g3507-blinky
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: firmware-${{ matrix.os }}
+          path: |
+            examples/mspm0g3507-blinky/.pio/build/*/firmware.elf
+            examples/mspm0g3507-blinky/.pio/build/*/firmware.bin
+          if-no-files-found: error
