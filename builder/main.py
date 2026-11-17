@@ -83,6 +83,14 @@ else:
         )
 
 COMPILER_PATH = platform.get_package_dir(GCC_ARM_COMPILER_PACKAGE_NAME)
+if not COMPILER_PATH:
+    errAndExit(
+        "Error: GCC ARM toolchain package not found.\n"
+        "If you override it via `platform_packages`, verify that the package\n"
+        "directory exists and that its package.json \"system\" field matches\n"
+        "this host (PlatformIO silently ignores tool packages built for a\n"
+        "different system)."
+    )
 
 TI_C_COMPILER_PATH = join(COMPILER_PATH, 'bin', 'arm-none-eabi-gcc')
 TI_CPP_COMPILER_PATH = join(COMPILER_PATH, 'bin', 'arm-none-eabi-g++')
