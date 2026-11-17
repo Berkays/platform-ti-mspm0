@@ -203,7 +203,10 @@ def _parse_cli_device(directive):
 syscfg_family_raw = _parse_cli_device("cliArgs")
 syscfg_part_raw = _parse_cli_device("v2CliArgs")
 
-startupDriverMCUDesignator = mcu_to_syscfg_family(syscfg_family_raw or syscfg_part_raw)
+# The exact device name from "@v2CliArgs --device" is authoritative when
+# present; fall back to the "@cliArgs" device family for files written by
+# older SysConfig versions.
+startupDriverMCUDesignator = mcu_to_syscfg_family(syscfg_part_raw or syscfg_family_raw)
 if not startupDriverMCUDesignator or not startupDriverMCUDesignator.startswith("mspm0"):
     errAndExit(
         'Failed to parse the MCU device from "%s".\n'
@@ -214,8 +217,28 @@ if not startupDriverMCUDesignator or not startupDriverMCUDesignator.startswith("
 
 # Guard against board <-> .syscfg device mismatches that would otherwise
 # fail much later with confusing linker/upload errors.
-board_family = mcu_to_syscfg_family(board.get("build.mcu"))
-if startupDriverMCUDesignator != board_family:
+board_mcu = (board.get("build.mcu") or "").strip().lower()
+board_family = mcu_to_syscfg_family(board_mcu)
+if syscfg_part_raw:
+    # Exact device matching: the "@v2CliArgs --device" part number must be
+    # the same MCU as the selected board.
+    if syscfg_part_raw.lower() != board_mcu:
+        suggested = syscfg_part_raw.lower()
+        suggestion = (
+            "\nSuggestion: use 'board = %s' in platformio.ini" % suggested
+            if isfile(join(platform.get_dir(), "boards", "%s.json" % suggested))
+            else ""
+        )
+        errAndExit(
+            "Error: device mismatch between board and .syscfg file:\n"
+            "  board '%s' is an %s (device family '%s')\n"
+            "  '%s' targets device '%s' (device family '%s')%s\n"
+            "Use a matching board in platformio.ini, or update your .syscfg file."
+            % (BOARD_MCU_NAME, board_mcu, board_family, sysConfigFile,
+               syscfg_part_raw, startupDriverMCUDesignator, suggestion)
+        )
+elif startupDriverMCUDesignator != board_family:
+    # No exact device in the file: compare device families
     errAndExit(
         "Error: device mismatch between board and .syscfg file:\n"
         "  board '%s' expects device family '%s'\n"
